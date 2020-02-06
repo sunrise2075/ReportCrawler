@@ -1,0 +1,4 @@
+.DS_Store
+.idea/
+venv/
+reportcrawler/report_crawler.log
