@@ -1,11 +1,12 @@
 import datetime
 import logging
-import time
 import os
 import random
-import requests
+import time
 import zipfile
 from pathlib import Path
+
+import requests
 
 
 class ReportCrawler:
@@ -40,8 +41,8 @@ class ReportCrawler:
         ]
 
     def spy_save(self):
-        sub_folder_prefix = 'subFolder'
-        sub_folder_suffix_idx = 0
+        sub_folder_prefix = '2018中小企业板企业年报'
+        sub_folder_suffix_idx = 7
         index = 0
 
         for stock_code in self.input_stock_code:
@@ -190,31 +191,3 @@ class ReportCrawler:
         logging.info('当前处理%s的公告，下载文件路径%s， 生成pdf文件名称%s', stock_code, download_url, file_name)
 
 
-class StockCode:
-    def __init__(self, serial_no=None, plate=None):
-        self.serial_no = serial_no or '000000'
-        self.plate = plate.lower() or 'non'
-
-    def get_serial_no(self):
-        return self.serial_no
-
-    def get_plate(self):
-        return self.plate
-
-    def __str__(self):
-        return "%s.%s" % (self.serial_no, self.plate)
-
-
-stock_code_list = []
-with open('stockCode.txt', 'r') as reader:
-    # Read & print the entire file
-    text_content = reader.read()
-    lines = text_content.split('\n')
-    for line in lines:
-        serial_no, plate = line.split('.')
-        stock_code_list.append(StockCode(serial_no=serial_no, plate=plate))
-
-reportCrawler = ReportCrawler(report_file_download_path="http://static.cninfo.com.cn/",
-                              savePath="/Users/sunrise2075/Documents/张翰清博士数据/2018营收千亿企业年报",
-                              input_stock_code=stock_code_list);
-reportCrawler.spy_save()
