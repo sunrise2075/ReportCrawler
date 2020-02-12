@@ -11,15 +11,18 @@ import requests
 
 class ReportCrawler:
 
-    def __init__(self, report_file_download_path=None, savePath=None, input_stock_code=None, year=None):
+    def __init__(self, report_file_download_base_path=None, report_list_query_url=None, savePath=None,
+                 stock_code_list=None, report_file_title_whitelist=None, report_file_title_blacklist=None, year=None):
         logging.basicConfig(filename='report_crawler.log', format='%(asctime)s %(message)s', filemode='w',
                             level=logging.INFO)
         self.recsPerPage = 30
-        self.report_list_query_path = 'http://www.cninfo.com.cn/new/hisAnnouncement/query'
-        self.report_file_download_path = report_file_download_path or "http://static.cninfo.com.cn/"
+        self.report_list_query_path = report_list_query_url
+        self.report_file_download_path = report_file_download_base_path or "http://static.cninfo.com.cn/"
+        self.report_file_title_whitelist = report_file_title_whitelist or []
+        self.report_file_title_blacklist = report_file_title_blacklist or []
         self.savePath = savePath or "./download"
         self.year = year or datetime.datetime.now().year
-        self.input_stock_code = input_stock_code or set()
+        self.input_stock_code = stock_code_list or set()
         self.http_headers = {'Accept': 'application/json, text/javascript, */*; q=0.01',
                              "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8",
                              "Accept-Encoding": "gzip, deflate",
@@ -41,12 +44,12 @@ class ReportCrawler:
         ]
 
     def spy_save(self):
-        sub_folder_prefix = '2018中小企业板企业年报'
-        sub_folder_suffix_idx = 7
-        index = 0
+        sub_folder_prefix = self.report_file_title_whitelist[-1]
+        rolling_folder_suffix_number = 0
 
+        rolling_file_number = 0
         for stock_code in self.input_stock_code:
-            index += 1
+            rolling_file_number += 1
             serial_no = stock_code.get_serial_no()
             plate = stock_code.get_plate()
 
@@ -59,15 +62,15 @@ class ReportCrawler:
                 except:
                     print(stock_code, 'page error')
 
-            sub_folder_name = sub_folder_prefix + str(sub_folder_suffix_idx)
+            sub_folder_name = sub_folder_prefix + "_" + str(rolling_folder_suffix_number)
             self.saving(announcements, stock_code, sub_folder_name)
-            if index % 100 == 0:
+            if rolling_file_number % 100 == 0:
                 # 压缩文件夹
                 self.create_zip_file(self.savePath + "//" + sub_folder_name, self.savePath + "//" + sub_folder_name)
-                sub_folder_suffix_idx += 1
+                rolling_folder_suffix_number += 1
 
         # 压缩最后一个文件夹
-        sub_folder_name = sub_folder_prefix + str(sub_folder_suffix_idx)
+        sub_folder_name = sub_folder_prefix + str(rolling_folder_suffix_number)
         self.create_zip_file(self.savePath + "//" + sub_folder_name, self.savePath + "//" + sub_folder_name)
 
     def create_zip_file(self, src_folder, target_file_name):
@@ -111,43 +114,15 @@ class ReportCrawler:
         """
         assert announcement_title is not None and len(announcement_title) > 0
 
-        possible_titles = [
-            '2018年年度报告（更新后）',
-            '2018年年度报告（更正版）',
-            '2018年年度报告（更新版）',
-            '2018年年度报告（2019年修订）',
-            '2018年年度报告（修订版）',
-            '2018年年度报告（更正）',
-            '2018年年度报告'
-        ]
-        for possible_title in possible_titles:
+        for possible_title in self.report_file_title_whitelist:
             if possible_title == announcement_title:
                 return True
 
         return False
 
     def in_announcement_title_blacklist(self, announcement_title: str) -> bool:
-        announcement_title_blacklist = [
-            'H股公告-2018年年度报告',
-            '2018年年度报告（已取消）',
-            '2018年年度报告（英文版）',
-            '2018年年度报告摘要',
-            '2018年年度报告摘要（英文版）',
-            '2018年年度报告摘要（修订版）',
-            '2018年年度报告摘要（更新后）',
-            '2018年年度报告摘要（已取消）',
-            '2018年年度报告（印刷版）',
-            '2018年年度报告（修订版）',
-            '2018年年度报告（修订稿）',
-            '2018年年度报告（修订后）',
-            '关于公司2018年年度报告修订说明',
-            '2018年年度报告摘要',
-            '2018年年度报告摘要（更正）',
-            '2018年年度报告摘要（修订后）',
-            '2018年半年度报告',
-            '2018年半年度报告（2019年修订）'
-        ]
-        for possible_title in announcement_title_blacklist:
+
+        for possible_title in self.report_file_title_blacklist:
             if possible_title == announcement_title:
                 return True
 
@@ -189,5 +164,3 @@ class ReportCrawler:
         f.write(r.content)
         f.close()
         logging.info('当前处理%s的公告，下载文件路径%s， 生成pdf文件名称%s', stock_code, download_url, file_name)
-
-
