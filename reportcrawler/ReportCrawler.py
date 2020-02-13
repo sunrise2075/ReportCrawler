@@ -2,6 +2,7 @@ import datetime
 import logging
 import os
 import random
+import re
 import time
 import zipfile
 from pathlib import Path
@@ -11,8 +12,12 @@ import requests
 
 class ReportCrawler:
 
-    def __init__(self, report_file_download_base_path=None, report_list_query_url=None, savePath=None,
-                 stock_code_list=None, report_file_title_whitelist=None, report_file_title_blacklist=None, year=None):
+    def __init__(self, report_file_download_base_path=None,
+                 report_list_query_url=None, savePath=None,
+                 report_post_query_param_dict=None,
+                 stock_code_list=None,
+                 report_file_title_whitelist=None,
+                 report_file_title_blacklist=None, year=None):
         logging.basicConfig(filename='report_crawler.log', format='%(asctime)s %(message)s', filemode='w',
                             level=logging.INFO)
         self.recsPerPage = 30
@@ -23,6 +28,7 @@ class ReportCrawler:
         self.savePath = savePath or "./download"
         self.year = year or datetime.datetime.now().year
         self.input_stock_code = stock_code_list or set()
+        self.report_post_query_param_dict = report_post_query_param_dict or dict()
         self.http_headers = {'Accept': 'application/json, text/javascript, */*; q=0.01',
                              "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8",
                              "Accept-Encoding": "gzip, deflate",
@@ -62,7 +68,7 @@ class ReportCrawler:
                 except:
                     print(stock_code, 'page error')
 
-            sub_folder_name = sub_folder_prefix + "_" + str(rolling_folder_suffix_number)
+            sub_folder_name: str = sub_folder_prefix + "_" + str(rolling_folder_suffix_number)
             self.saving(announcements, stock_code, sub_folder_name)
             if rolling_file_number % 100 == 0:
                 # 压缩文件夹
@@ -86,16 +92,10 @@ class ReportCrawler:
 
     def single_page_announcement(self, serial_no=None, plate=None):
         self.http_headers['User-Agent'] = random.choice(self.http_user_agents)  # 定义User_Agent
-        query = {
-            'stock': serial_no,
-            'tabName': 'fulltext',
-            'pageSize': self.recsPerPage,
-            'pageNum': 1,
-            'column': 'sse',
-            'category': 'category_ndbg_szsh;',
-            'plate': plate,
-            'isHLtitle': 'true'
-        }
+        query = self.report_post_query_param_dict
+        query['stock'] = serial_no
+        query['pageSize'] = self.recsPerPage
+        query['plate'] = plate
         namelist = requests.post(self.report_list_query_path, headers=self.http_headers, data=query)
         return namelist.json()['announcements']  # json中的年度报告信息
 
@@ -135,6 +135,8 @@ class ReportCrawler:
         for announcement in announcements:
 
             announcement_title: str = announcement['announcementTitle']
+            # 标题中可能会包含html标签
+            announcement_title = ReportCrawler.remove_html_tags(announcement_title)
             download_url = self.report_file_download_path + announcement["adjunctUrl"]
             file_name = announcement["secCode"] + '_' + announcement['secName'] + '_' + announcement_title + '.pdf'
 
@@ -142,12 +144,64 @@ class ReportCrawler:
                 self.download_file(download_url, sub_folder, file_name, stock_code)
                 break
             else:
-                if '2018' in announcement_title and not self.in_announcement_title_blacklist(announcement_title):
+                # 考虑到按照年份的年报，如果标题没有出现在白名单，也没有出现在黑名单中，我们需要先下载文件，并且提示用户特别关注
+                if self.year in announcement_title and not self.in_announcement_title_blacklist(announcement_title):
                     logging.warning("这个公告文件的名字有点特别, 你需要确定自己是否需要这个文件。股票信息: %s, 公告标题: %s，", stock_code,
                                     announcement_title)
                     self.download_file(download_url, sub_folder, file_name, stock_code)
 
                 continue
+
+    @classmethod
+    def remove_html_tags(self, file_name_str):
+        # 先过滤CDATA
+        re_cdata = re.compile('//<!\[CDATA\[[^>]*//\]\]>', re.I)  # 匹配CDATA
+        re_script = re.compile('<\s*script[^>]*>[^<]*<\s*/\s*script\s*>', re.I)  # Script
+        re_style = re.compile('<\s*style[^>]*>[^<]*<\s*/\s*style\s*>', re.I)  # style
+        re_br = re.compile('<br\s*?/?>')  # 处理换行
+        re_h = re.compile('</?\w+[^>]*>')  # HTML标签
+        re_comment = re.compile('<!--[^>]*-->')  # HTML注释
+        s = re_cdata.sub('', file_name_str)  # 去掉CDATA
+        s = re_script.sub('', s)  # 去掉SCRIPT
+        s = re_style.sub('', s)  # 去掉style
+        s = re_br.sub('\n', s)  # 将br转换为换行
+        s = re_h.sub('', s)  # 去掉HTML 标签
+        s = re_comment.sub('', s)  # 去掉HTML注释
+        # 去掉多余的空行
+        blank_line = re.compile('\n+')
+        s = blank_line.sub('\n', s)
+        # s = ReportCrawler.replaceCharEntity(s)  # 替换实体
+        return s
+
+    ##替换常用HTML字符实体.
+    # 使用正常的字符替换HTML中特殊的字符实体.
+    # 你可以添加新的实体字符到CHAR_ENTITIES中,处理更多HTML字符实体.
+    # @param htmlstr HTML字符串.
+    @classmethod
+    def replaceCharEntity(htmlstr: str):
+        CHAR_ENTITIES = {'nbsp': ' ', '160': ' ',
+                         'lt': '<', '60': '<',
+                         'gt': '>', '62': '>',
+                         'amp': '&', '38': '&',
+                         'quot': '"', '34': '"', }
+
+        re_charEntity = re.compile(r'&#?(?P<name>\w+);')
+        sz = re_charEntity.search(htmlstr)
+        while sz:
+            entity = sz.group()  # entity全称，如&gt;
+            key = sz.group('name')  # 去除&;后entity,如&gt;为gt
+            try:
+                htmlstr = re_charEntity.sub(CHAR_ENTITIES[key], htmlstr, 1)
+                sz = re_charEntity.search(htmlstr)
+            except KeyError:
+                # 以空串代替
+                htmlstr = re_charEntity.sub('', htmlstr, 1)
+                sz = re_charEntity.search(htmlstr)
+        return htmlstr
+
+    @classmethod
+    def repalce(s, re_exp, repl_string):
+        return re_exp.sub(repl_string, s)
 
     def download_file(self, download_url, sub_folder, file_name, stock_code):
         if '*' in file_name:
