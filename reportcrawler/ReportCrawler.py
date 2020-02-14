@@ -1,3 +1,4 @@
+import abc
 import datetime
 import logging
 import os
@@ -61,23 +62,33 @@ class ReportCrawler:
 
             try:
                 announcements = self.single_page_announcement(serial_no, plate)
+                self.save_to_disk(announcements, rolling_file_number,
+                                  rolling_folder_suffix_number, stock_code,
+                                  sub_folder_prefix)
             except:
                 print(stock_code, 'page error, retrying')
                 try:
                     announcements = self.single_page_announcement(serial_no, plate)
+                    self.save_to_disk(announcements, rolling_file_number,
+                                      rolling_folder_suffix_number, stock_code,
+                                      sub_folder_prefix)
                 except:
                     print(stock_code, 'page error')
 
-            sub_folder_name: str = sub_folder_prefix + "_" + str(rolling_folder_suffix_number)
-            self.saving(announcements, stock_code, sub_folder_name)
-            if rolling_file_number % 100 == 0:
-                # 压缩文件夹
-                self.create_zip_file(self.savePath + "//" + sub_folder_name, self.savePath + "//" + sub_folder_name)
-                rolling_folder_suffix_number += 1
-
+        # stock_code in self.input_stock_code执行结束以后
         # 压缩最后一个文件夹
         sub_folder_name = sub_folder_prefix + str(rolling_folder_suffix_number)
         self.create_zip_file(self.savePath + "//" + sub_folder_name, self.savePath + "//" + sub_folder_name)
+
+    def save_to_disk(self, announcements, rolling_file_number, rolling_folder_suffix_number, stock_code,
+                     sub_folder_prefix):
+        sub_folder_name: str = sub_folder_prefix + "_" + str(rolling_folder_suffix_number)
+        self.save_file(announcements, stock_code, sub_folder_name)
+        if rolling_file_number % 100 == 0:
+            # 压缩文件夹
+            self.create_zip_file(self.savePath + "//" + sub_folder_name, self.savePath + "//" + sub_folder_name)
+            rolling_folder_suffix_number += 1
+        return rolling_folder_suffix_number
 
     def create_zip_file(self, src_folder, target_file_name):
 
@@ -106,7 +117,7 @@ class ReportCrawler:
         3. 满足条件1和2之后， 不能包含如下全部字符：摘要 英文版 已取消
     '''
 
-    def in_yearly_announcement_title_whitelist(self, announcement_title):
+    def is_in_title_whitelist(self, announcement_title):
 
         """
         Check if the given title is in possible_titles
@@ -120,7 +131,7 @@ class ReportCrawler:
 
         return False
 
-    def in_announcement_title_blacklist(self, announcement_title: str) -> bool:
+    def is_in_title_blacklist(self, announcement_title: str) -> bool:
 
         for possible_title in self.report_file_title_blacklist:
             if possible_title == announcement_title:
@@ -128,29 +139,9 @@ class ReportCrawler:
 
         return False
 
-    def saving(self, announcements, stock_code, sub_folder):
-        if len(announcements) == 0:
-            logging.warning('当前处理%s的公告，找不到任何年报数据', stock_code)
-
-        for announcement in announcements:
-
-            announcement_title: str = announcement['announcementTitle']
-            # 标题中可能会包含html标签
-            announcement_title = ReportCrawler.remove_html_tags(announcement_title)
-            download_url = self.report_file_download_path + announcement["adjunctUrl"]
-            file_name = announcement["secCode"] + '_' + announcement['secName'] + '_' + announcement_title + '.pdf'
-
-            if self.in_yearly_announcement_title_whitelist(announcement_title):
-                self.download_file(download_url, sub_folder, file_name, stock_code)
-                break
-            else:
-                # 考虑到按照年份的年报，如果标题没有出现在白名单，也没有出现在黑名单中，我们需要先下载文件，并且提示用户特别关注
-                if self.year in announcement_title and not self.in_announcement_title_blacklist(announcement_title):
-                    logging.warning("这个公告文件的名字有点特别, 你需要确定自己是否需要这个文件。股票信息: %s, 公告标题: %s，", stock_code,
-                                    announcement_title)
-                    self.download_file(download_url, sub_folder, file_name, stock_code)
-
-                continue
+    @abc.abstractmethod
+    def save_file(self, report_file_info_item, stock_code, sub_folder):
+        return
 
     @classmethod
     def remove_html_tags(self, file_name_str):
