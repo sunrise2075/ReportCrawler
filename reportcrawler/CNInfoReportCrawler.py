@@ -1,6 +1,7 @@
 import logging
 
 from reportcrawler.ReportCrawler import ReportCrawler
+from reportcrawler.StockCode import StockCode
 
 '''
 巨浪资讯：http://www.cninfo.com.cn/new/index
@@ -10,18 +11,43 @@ from reportcrawler.ReportCrawler import ReportCrawler
 
 class CNInfoReportCrawler(ReportCrawler):
 
-    def __init__(self, report_file_download_base_path=None,
-                 report_list_query_url=None, savePath=None,
-                 report_post_query_param_dict=None,
-                 stock_code_list=None,
-                 report_file_title_whitelist=None,
-                 report_file_title_blacklist=None, year=None):
+    def __init__(self, options:dict=None):
+        report_file_download_base_path = options['report']['file']['download']['baseUrl']
+        report_file_save_path = options['report']['file']['savePath']
+        report_file_list_query_url = options['report']['file']['list']['queryUrl']
+        report_file_title_whitelist = options['report']['file']['title']['whiteList']
+        report_file_title_blacklist = options['report']['file']['title']['blackList']
+        report_post_query_param_dict = options['report']['file']['post']['query']
+        code_str_len = options['stock']['code']['strLength']
+        code_range_from = options['stock']['code']['range']['from']
+        code_range_to = options['stock']['code']['range']['to']
+        code_range_plate = options['stock']['code']['range']['plate']
+        code_file_path = options['stock']['code']['filePath']
+
+        stock_code_list = []
+        for serial_no in range(code_range_from, code_range_to + 1):
+            stock_code = StockCode(serial_no=str(serial_no).zfill(code_str_len), plate=code_range_plate)
+            stock_code_list.append(stock_code)
+
+        # with open(code_file_path, 'r') as reader:
+        #     # Read & print the entire file
+        #     text_content = reader.read()
+        #     lines = text_content.split('\n')
+        #     for line in lines:
+        #         serial_no = None
+        #         plate = None
+        #         if "." in line:
+        #             serial_no, plate = line.split('.')
+        #             stock_code_list.append(StockCode(serial_no=serial_no, plate=plate))
+        #         else:
+        #             print("%s的股票代码，不知道是深市还是沪市，无法处理" % line)
+
         super(CNInfoReportCrawler, self).__init__(report_file_download_base_path=report_file_download_base_path,
-                                                  report_list_query_url=report_list_query_url, savePath=savePath,
+                                                  report_list_query_url=report_file_list_query_url, savePath=report_file_save_path,
                                                   report_post_query_param_dict=report_post_query_param_dict,
                                                   stock_code_list=stock_code_list,
                                                   report_file_title_whitelist=report_file_title_whitelist,
-                                                  report_file_title_blacklist=report_file_title_blacklist, year=year)
+                                                  report_file_title_blacklist=report_file_title_blacklist, year='2018')
 
     def save_file(self, report_file_info_item, stock_code, sub_folder):
         if len(report_file_info_item) == 0:
