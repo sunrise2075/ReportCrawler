@@ -39,11 +39,11 @@ if __name__ == '__main__':
         #         else:
         #             print("%s的股票代码，不知道是深市还是沪市，无法处理" % line)
 
-    reportCrawler = CNInfoReportCrawler(report_file_download_base_path=report_file_download_base_path,
-                                        report_list_query_url=report_file_list_query_url,
-                                        report_post_query_param_dict=report_post_query_param_dict,
-                                        report_file_title_whitelist=report_file_title_whitelist,
-                                        report_file_title_blacklist=report_file_title_blacklist,
-                                        savePath=report_file_save_path,
-                                        stock_code_list=stock_code_list, year='2018');
+    reportCrawler: ReportCrawler = CNInfoReportCrawler(report_file_download_base_path=report_file_download_base_path,
+                                                       report_list_query_url=report_file_list_query_url,
+                                                       report_post_query_param_dict=report_post_query_param_dict,
+                                                       report_file_title_whitelist=report_file_title_whitelist,
+                                                       report_file_title_blacklist=report_file_title_blacklist,
+                                                       savePath=report_file_save_path,
+                                                       stock_code_list=stock_code_list, year='2018');
     reportCrawler.spy_save()
