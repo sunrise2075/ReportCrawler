@@ -52,6 +52,7 @@ class CNInfoReportCrawler(ReportCrawler):
     def save_file(self, report_file_info_item, stock_code, sub_folder):
         if len(report_file_info_item) == 0:
             logging.warning('当前处理%s的公告，找不到任何年报数据', stock_code)
+            return
 
         for announcement in report_file_info_item:
 

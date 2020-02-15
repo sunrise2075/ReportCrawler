@@ -3,9 +3,9 @@ cninfo:
     code:
       strLength: 6
       range:
-        from: 688001
-        to: 688039
-        plate: SH
+        from: 300574
+        to: 300820
+        plate: SZ
       filePath: ./stockCode.txt
 
   report:
@@ -18,15 +18,15 @@ cninfo:
         query:
           tabName: fulltext
           pageNum: 1,
-          column: sse
+          column: szse
   #        category: category_ndbg_szsh;
           searchkey: 招股说明书;
           isHLtitle: true
       savePath: /Users/sunrise2075/Documents/张翰清博士数据/科创板招股说明书
       title:
         whiteList:
-            - 首次公开发行股票并在科创板上市招股说明书（更新后）
-            - 首次公开发行股票并在科创板上市招股说明书
+            - 首次公开发行股票并在创业板上市招股说明书（更新后）
+            - 首次公开发行股票并在创业板上市招股说明书
   #          - 2018年年度报告（更新后）
   #          - 2018年年度报告（更正版）
   #          - 2018年年度报告（更新版）

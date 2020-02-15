@@ -30,6 +30,7 @@ class ReportCrawler:
         self.year = year or datetime.datetime.now().year
         self.input_stock_code = stock_code_list or set()
         self.report_post_query_param_dict = report_post_query_param_dict or dict()
+        self.rolling_folder_number = 0
         self.http_headers = {'Accept': 'application/json, text/javascript, */*; q=0.01',
                              "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8",
                              "Accept-Encoding": "gzip, deflate",
@@ -51,10 +52,9 @@ class ReportCrawler:
         ]
 
     def spy_save(self):
-        sub_folder_prefix = self.report_file_title_whitelist[-1]
-        rolling_folder_suffix_number = 0
+        sub_folder_name = self.report_file_title_whitelist[-1]
 
-        rolling_file_number = 0
+        rolling_file_number = 1
         for stock_code in self.input_stock_code:
             rolling_file_number += 1
             serial_no = stock_code.get_serial_no()
@@ -62,43 +62,42 @@ class ReportCrawler:
 
             try:
                 announcements = self.single_page_announcement(serial_no, plate)
-                self.save_to_disk(announcements, rolling_file_number,
-                                  rolling_folder_suffix_number, stock_code,
-                                  sub_folder_prefix)
+                self.save_to_disk(announcements, rolling_file_number, stock_code,
+                                  sub_folder_name)
             except:
                 print(stock_code, 'page error, retrying')
                 try:
                     announcements = self.single_page_announcement(serial_no, plate)
-                    self.save_to_disk(announcements, rolling_file_number,
-                                      rolling_folder_suffix_number, stock_code,
-                                      sub_folder_prefix)
+                    self.save_to_disk(announcements, rolling_file_number, stock_code,
+                                      sub_folder_name)
                 except:
                     print(stock_code, 'page error')
 
         # stock_code in self.input_stock_code执行结束以后
         # 压缩最后一个文件夹
-        sub_folder_name = sub_folder_prefix + str(rolling_folder_suffix_number)
+        sub_folder_name = sub_folder_name + str(self.rolling_folder_number)
         self.create_zip_file(self.savePath + "//" + sub_folder_name, self.savePath + "//" + sub_folder_name)
 
-    def save_to_disk(self, announcements, rolling_file_number, rolling_folder_suffix_number, stock_code,
+    def save_to_disk(self, announcements, rolling_file_number, stock_code,
                      sub_folder_prefix):
-        sub_folder_name: str = sub_folder_prefix + "_" + str(rolling_folder_suffix_number)
+        sub_folder_name: str = sub_folder_prefix + "_" + str(self.rolling_folder_number)
         self.save_file(announcements, stock_code, sub_folder_name)
         if rolling_file_number % 100 == 0:
             # 压缩文件夹
             self.create_zip_file(self.savePath + "//" + sub_folder_name, self.savePath + "//" + sub_folder_name)
-            rolling_folder_suffix_number += 1
-        return rolling_folder_suffix_number
+            self.rolling_folder_number += 1
 
-    def create_zip_file(self, src_folder, target_file_name):
+    @staticmethod
+    def create_zip_file(src_folder, target_file_name):
 
         file_news = target_file_name + '.zip'  # 压缩后文件夹的名字
         z = zipfile.ZipFile(file_news, 'w', zipfile.ZIP_DEFLATED)  # 参数一：文件夹名
         for dirpath, dirnames, filenames in os.walk(src_folder):
             fpath = dirpath.replace(src_folder, '')  # 这一句很重要，不replace的话，就从根目录开始复制
             fpath = fpath and fpath + os.sep or ''  # 这句话理解我也点郁闷，实现当前文件夹以及包含的所有文件的压缩
-            for filename in filenames:
-                z.write(os.path.join(dirpath, filename), fpath + filename)
+            if len(filenames) > 0:
+                for filename in filenames:
+                    z.write(os.path.join(dirpath, filename), fpath + filename)
         z.close()
 
     def single_page_announcement(self, serial_no=None, plate=None):
@@ -141,7 +140,7 @@ class ReportCrawler:
 
     @abc.abstractmethod
     def save_file(self, report_file_info_item, stock_code, sub_folder):
-        return
+        raise NotImplementedError("Must override save_file")
 
     @classmethod
     def remove_html_tags(self, file_name_str):
