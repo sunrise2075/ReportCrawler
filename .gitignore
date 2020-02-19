@@ -2,3 +2,4 @@
 .idea/
 venv/
 reportcrawler/report_crawler.log
+reportcrawler/__pycache__/
