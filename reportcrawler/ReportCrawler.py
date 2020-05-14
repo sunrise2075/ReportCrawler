@@ -26,7 +26,7 @@ class ReportCrawler:
         self.report_file_download_path = report_file_download_base_path or "http://static.cninfo.com.cn/"
         self.report_file_title_whitelist = report_file_title_whitelist or []
         self.report_file_title_blacklist = report_file_title_blacklist or []
-        self.savePath = savePath or "./download"
+        self.savePath = ReportCrawler.remove_html_tags(savePath or "./download")
         self.year = year or datetime.datetime.now().year
         self.input_stock_code = stock_code_list or set()
         self.report_post_query_param_dict = report_post_query_param_dict or dict()
@@ -80,7 +80,7 @@ class ReportCrawler:
 
     def save_to_disk(self, announcements, rolling_file_number, stock_code,
                      sub_folder_prefix):
-        sub_folder_name: str = sub_folder_prefix + "_" + str(self.rolling_folder_number)
+        sub_folder_name: str = ReportCrawler.remove_html_tags(sub_folder_prefix) + "_" + ReportCrawler.remove_html_tags(str(self.rolling_folder_number))
         self.save_file(announcements, stock_code, sub_folder_name)
         if rolling_file_number % 100 == 0:
             # 压缩文件夹
@@ -89,16 +89,25 @@ class ReportCrawler:
 
     @staticmethod
     def create_zip_file(src_folder, target_file_name):
+        if os.path.exists(src_folder):
+            folder_content = os.listdir(src_folder)
+            if len(folder_content)>0:
+                zipfile_name = target_file_name + '.zip'  # 压缩后文件夹的名字
+                z = zipfile.ZipFile(zipfile_name, 'w', zipfile.ZIP_DEFLATED)  # 参数一：文件夹名
+                for dirpath, dirnames, filenames in os.walk(src_folder):
+                    fpath = dirpath.replace(src_folder, '')  # 这一句很重要，不replace的话，就从根目录开始复制
+                    fpath = fpath and fpath + os.sep or ''  # 这句话理解我也点郁闷，实现当前文件夹以及包含的所有文件的压缩
+                    if len(filenames) > 0:
+                        for filename in filenames:
+                            z.write(os.path.join(dirpath, filename), fpath + filename)
+                z.close()
 
-        file_news = target_file_name + '.zip'  # 压缩后文件夹的名字
-        z = zipfile.ZipFile(file_news, 'w', zipfile.ZIP_DEFLATED)  # 参数一：文件夹名
-        for dirpath, dirnames, filenames in os.walk(src_folder):
-            fpath = dirpath.replace(src_folder, '')  # 这一句很重要，不replace的话，就从根目录开始复制
-            fpath = fpath and fpath + os.sep or ''  # 这句话理解我也点郁闷，实现当前文件夹以及包含的所有文件的压缩
-            if len(filenames) > 0:
-                for filename in filenames:
-                    z.write(os.path.join(dirpath, filename), fpath + filename)
-        z.close()
+    @staticmethod
+    def get_plate_code(serial_code: str):
+        if serial_code > 60000:
+            return "SH"
+        else:
+            return "SZ"
 
     def single_page_announcement(self, serial_no=None, plate=None):
         self.http_headers['User-Agent'] = random.choice(self.http_user_agents)  # 定义User_Agent
@@ -123,7 +132,6 @@ class ReportCrawler:
         @precondition: C{announcement_title} is not empty
         """
         assert announcement_title is not None and len(announcement_title) > 0
-
         for possible_title in self.report_file_title_whitelist:
             if possible_title == announcement_title:
                 return True
@@ -131,11 +139,9 @@ class ReportCrawler:
         return False
 
     def is_in_title_blacklist(self, announcement_title: str) -> bool:
-
         for possible_title in self.report_file_title_blacklist:
             if possible_title == announcement_title:
                 return True
-
         return False
 
     @abc.abstractmethod

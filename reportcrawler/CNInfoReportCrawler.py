@@ -11,43 +11,42 @@ from reportcrawler.StockCode import StockCode
 
 class CNInfoReportCrawler(ReportCrawler):
 
-    def __init__(self, options:dict=None):
+    def __init__(self, options: dict = None):
         report_file_download_base_path = options['report']['file']['download']['baseUrl']
         report_file_save_path = options['report']['file']['savePath']
         report_file_list_query_url = options['report']['file']['list']['queryUrl']
         report_file_title_whitelist = options['report']['file']['title']['whiteList']
         report_file_title_blacklist = options['report']['file']['title']['blackList']
         report_post_query_param_dict = options['report']['file']['post']['query']
-        code_str_len = options['stock']['code']['strLength']
-        code_range_from = options['stock']['code']['range']['from']
-        code_range_to = options['stock']['code']['range']['to']
-        code_range_plate = options['stock']['code']['range']['plate']
-        code_file_path = options['stock']['code']['filePath']
 
         stock_code_list = []
-        for serial_no in range(code_range_from, code_range_to + 1):
-            stock_code = StockCode(serial_no=str(serial_no).zfill(code_str_len), plate=code_range_plate)
-            stock_code_list.append(stock_code)
+        stock_code_range_start = options['stock']['code']['range']['from']
+        stock_code_range_end = options['stock']['code']['range']['to']
 
-        # with open(code_file_path, 'r') as reader:
-        #     # Read & print the entire file
-        #     text_content = reader.read()
-        #     lines = text_content.split('\n')
-        #     for line in lines:
-        #         serial_no = None
-        #         plate = None
-        #         if "." in line:
-        #             serial_no, plate = line.split('.')
-        #             stock_code_list.append(StockCode(serial_no=serial_no, plate=plate))
-        #         else:
-        #             print("%s的股票代码，不知道是深市还是沪市，无法处理" % line)
+        if stock_code_range_start != stock_code_range_end:
+            for serial_no in range(options['stock']['code']['range']['from'],
+                                   options['stock']['code']['range']['to'] + 1):
+                stock_code = StockCode(serial_no=str(serial_no).zfill(6), plate=ReportCrawler.get_plate_code(serial_no))
+                stock_code_list.append(stock_code)
+
+        if options['stock']['code']['filePath']:
+            with open(options['stock']['code']['filePath'], 'r') as reader:
+                # Read & print the entire file
+                text_content = reader.read()
+                lines = text_content.split('\n')
+                for line in lines:
+                    if line != '':
+                        serial_no = line
+                        plate = ReportCrawler.get_plate_code(serial_no)
+                        stock_code_list.append(StockCode(serial_no=serial_no, plate=plate))
 
         super(CNInfoReportCrawler, self).__init__(report_file_download_base_path=report_file_download_base_path,
-                                                  report_list_query_url=report_file_list_query_url, savePath=report_file_save_path,
+                                                  report_list_query_url=report_file_list_query_url,
+                                                  savePath=report_file_save_path,
                                                   report_post_query_param_dict=report_post_query_param_dict,
                                                   stock_code_list=stock_code_list,
                                                   report_file_title_whitelist=report_file_title_whitelist,
-                                                  report_file_title_blacklist=report_file_title_blacklist, year='2018')
+                                                  report_file_title_blacklist=report_file_title_blacklist, year='2019')
 
     def save_file(self, report_file_info_item, stock_code, sub_folder):
         if len(report_file_info_item) == 0:
@@ -68,7 +67,7 @@ class CNInfoReportCrawler(ReportCrawler):
             else:
                 # 考虑到按照年份的年报，如果标题没有出现在白名单，也没有出现在黑名单中，我们需要先下载文件，并且提示用户特别关注
                 if self.year in announcement_title and not self.is_in_title_blacklist(announcement_title):
-                    logging.warning("这个公告文件的名字有点特别, 你需要确定自己是否需要这个文件。股票信息: %s, 公告标题: %s，", stock_code,
+                    logging.warning("这个公告文件的名字不在文件名黑名单里面, 下载程序不能确定你是否需要这个文件。股票信息: %s, 公告标题: %s，", stock_code,
                                     announcement_title)
                     self.download_file(download_url, sub_folder, file_name, stock_code)
 
