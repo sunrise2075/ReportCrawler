@@ -8,7 +8,7 @@ class StockCode:
     def get_serial_no(self):
         return self.serial_no
 
-    def get_plate(self):
+    def get_plate_code(self):
         return self.plate
 
     def __str__(self):
