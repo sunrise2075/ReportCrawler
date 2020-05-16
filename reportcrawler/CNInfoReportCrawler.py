@@ -48,13 +48,12 @@ class CNInfoReportCrawler(ReportCrawler):
                                                   report_file_title_whitelist=report_file_title_whitelist,
                                                   report_file_title_blacklist=report_file_title_blacklist, year='2019')
 
-    def fetch_file(self, announcement_items, stock_code, folder_name):
+    def request_report_file(self, announcement_items, stock_code, folder_name):
         if len(announcement_items) == 0:
             logging.warning('当前处理%s的公告，找不到任何年报数据', stock_code)
             return
 
         for announcement in announcement_items:
-
             announcement_title: str = announcement['announcementTitle']
             # 标题中可能会包含html标签
             announcement_title = ReportCrawler.remove_html_tags(announcement_title)

@@ -52,50 +52,50 @@ class ReportCrawler:
         ]
 
     def spy_save(self):
-        sub_folder_name = self.report_file_title_whitelist[-1]
-
-        rolling_file_number = 1
+        report_serial_number = 1
         for stock_code in self.input_stock_code:
-            rolling_file_number += 1
+
+            report_serial_number += 1
+
+            current_report_folder: str = ReportCrawler.remove_html_tags(
+                self.report_file_title_whitelist[-1]) + "_" + ReportCrawler.remove_html_tags(
+                str(self.rolling_folder_number))
+            current_report_folder_full_path = self.savePath + "//" + current_report_folder
+
             serial_no = stock_code.get_serial_no()
-            plate = stock_code.get_plate()
+            plate = stock_code.get_plate_code()
 
             try:
-                announcements = self.single_page_announcement(serial_no, plate)
-                self.save_to_disk(announcements, rolling_file_number, stock_code,
-                                  sub_folder_name)
+                announcements = self.fetch_announcements(serial_no, plate)
+                self.request_report_file(announcements, stock_code, current_report_folder)
+
+                if os.path.exists(current_report_folder_full_path):
+                    report_list = os.listdir(current_report_folder_full_path)
+                    if len(report_list) % 200 == 0:
+                        self.create_zip_file(current_report_folder_full_path)
+                        self.rolling_folder_number += 1
             except:
                 print(stock_code, 'page error, retrying')
                 try:
-                    announcements = self.single_page_announcement(serial_no, plate)
-                    self.save_to_disk(announcements, rolling_file_number, stock_code,
-                                      sub_folder_name)
+                    announcements = self.fetch_announcements(serial_no, plate)
+                    self.request_report_file(announcements, stock_code, self.report_file_title_whitelist[-1])
                 except:
                     print(stock_code, 'page error')
 
         # stock_code in self.input_stock_code执行结束以后
         # 压缩最后一个文件夹
-        sub_folder_name = sub_folder_name + str(self.rolling_folder_number)
+        sub_folder_name = self.report_file_title_whitelist[-1] + str(self.rolling_folder_number)
         self.create_zip_file(self.savePath + "//" + sub_folder_name, self.savePath + "//" + sub_folder_name)
 
-    def save_to_disk(self, announcements, rolling_file_number, stock_code,
-                     sub_folder_prefix):
-        sub_folder_name: str = ReportCrawler.remove_html_tags(sub_folder_prefix) + "_" + ReportCrawler.remove_html_tags(str(self.rolling_folder_number))
-        self.save_file(announcements, stock_code, sub_folder_name)
-        if rolling_file_number % 100 == 0:
-            # 压缩文件夹
-            self.create_zip_file(self.savePath + "//" + sub_folder_name, self.savePath + "//" + sub_folder_name)
-            self.rolling_folder_number += 1
-
     @staticmethod
-    def create_zip_file(src_folder, target_file_name):
-        if os.path.exists(src_folder):
-            folder_content = os.listdir(src_folder)
-            if len(folder_content)>0:
-                zipfile_name = target_file_name + '.zip'  # 压缩后文件夹的名字
+    def create_zip_file(full_path_folder_name):
+        if os.path.exists(full_path_folder_name):
+            folder_content = os.listdir(full_path_folder_name)
+            if len(folder_content) > 0:
+                zipfile_name = full_path_folder_name + '.zip'  # 压缩后文件夹的名字
                 z = zipfile.ZipFile(zipfile_name, 'w', zipfile.ZIP_DEFLATED)  # 参数一：文件夹名
-                for dirpath, dirnames, filenames in os.walk(src_folder):
-                    fpath = dirpath.replace(src_folder, '')  # 这一句很重要，不replace的话，就从根目录开始复制
+                for dirpath, dirnames, filenames in os.walk(full_path_folder_name):
+                    fpath = dirpath.replace(full_path_folder_name, '')  # 这一句很重要，不replace的话，就从根目录开始复制
                     fpath = fpath and fpath + os.sep or ''  # 这句话理解我也点郁闷，实现当前文件夹以及包含的所有文件的压缩
                     if len(filenames) > 0:
                         for filename in filenames:
@@ -104,12 +104,12 @@ class ReportCrawler:
 
     @staticmethod
     def get_plate_code(serial_code: str):
-        if serial_code > 60000:
+        if serial_code.startswith("6"):
             return "SH"
         else:
             return "SZ"
 
-    def single_page_announcement(self, serial_no=None, plate=None):
+    def fetch_announcements(self, serial_no=None, plate=None):
         self.http_headers['User-Agent'] = random.choice(self.http_user_agents)  # 定义User_Agent
         query = self.report_post_query_param_dict
         query['stock'] = serial_no
@@ -145,7 +145,7 @@ class ReportCrawler:
         return False
 
     @abc.abstractmethod
-    def save_file(self, report_file_info_item, stock_code, sub_folder):
+    def request_report_file(self, report_file_info_item, stock_code, sub_folder):
         raise NotImplementedError("Must override save_file")
 
     @classmethod

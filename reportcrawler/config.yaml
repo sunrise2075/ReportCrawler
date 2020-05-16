@@ -4,7 +4,7 @@ cninfo:
       length: 6
       range:
         from: 1
-        to: 1896
+        to: 1
       filePath: ./stockCode.txt
 
   report:
